@@ -1,0 +1,14 @@
+{
+  "name": "mvpconsult-functions",
+  "version": "1.0.0",
+  "description": "Netlify Functions for MVP Consulting testimonials",
+  "type": "module",
+  "dependencies": {
+    "@netlify/functions": "^2.0.0",
+    "@netlify/neon": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
