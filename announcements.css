@@ -1,0 +1,44 @@
+#announcement-bar {
+    background-color: #000;
+    color: #fff;
+    padding: 12px 0;
+    overflow: hidden;
+    white-space: nowrap;
+    width: 100%;
+    z-index: 999;
+    font-family: system-ui, sans-serif;
+    font-size: 16px;
+    display: none; /* Hidden by default until loaded */
+}
+
+.announcement-track {
+    display: inline-block;
+    white-space: nowrap;
+    padding-left: 100%; /* Start off-screen */
+    animation: marquee 30s linear infinite;
+}
+
+.announcement-item {
+    display: inline-block;
+    margin-right: 50px; /* Spacing between announcements */
+}
+
+.announcement-item:after {
+    content: "•";
+    margin-left: 50px;
+    opacity: 0.5;
+}
+
+.announcement-item:last-child:after {
+    content: ""; /* No separator after last item */
+    margin-left: 0;
+}
+
+.announcement-track:hover {
+    animation-play-state: paused;
+}
+
+@keyframes marquee {
+    0% { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-100%, 0, 0); }
+}

@@ -41,6 +41,32 @@ async function ensureTableExists() {
     `;
 
     console.log("Testimonials table created successfully!");
+  } else {
+    // Schema migration
+    try {
+        await sql`
+            ALTER TABLE testimonials
+            ADD COLUMN IF NOT EXISTS email VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS location VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS visa_type VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+            ADD COLUMN IF NOT EXISTS photo_url TEXT,
+            ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending',
+            ADD COLUMN IF NOT EXISTS rejection_reason TEXT,
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ADD COLUMN IF NOT EXISTS published_at TIMESTAMP
+        `;
+
+        await sql`
+          CREATE INDEX IF NOT EXISTS idx_testimonials_status ON testimonials(status)
+        `;
+
+        await sql`
+          CREATE INDEX IF NOT EXISTS idx_testimonials_created_at ON testimonials(created_at DESC)
+        `;
+    } catch (e) {
+        console.error("Error migrating testimonials table:", e);
+    }
   }
 }
 

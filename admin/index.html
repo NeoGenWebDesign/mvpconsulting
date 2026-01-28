@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Announcements Admin</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        textarea { width: 100%; height: 80px; padding: 8px; box-sizing: border-box; }
+        button { cursor: pointer; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        button.reject { background: #dc3545; }
+        button.reject:hover { background: #a71d2a; }
+        button.approve { background: #28a745; }
+        button.approve:hover { background: #1e7e34; }
+        button.delete { background: #6c757d; margin-left: 10px; }
+        
+        .list-section { margin-top: 40px; }
+        .item { border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .item-content { flex-grow: 1; margin-right: 20px; }
+        .item-meta { font-size: 0.85em; color: #666; margin-top: 5px; }
+        .actions { white-space: nowrap; }
+        
+        .status-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; font-weight: bold; text-transform: uppercase; }
+        .status-pending { background: #ffeeba; color: #856404; }
+        .status-approved { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>Announcements Admin</h1>
+    
+    <div class="form-section">
+        <h2>Add New Announcement</h2>
+        <form id="addForm">
+            <div class="form-group">
+                <label for="content">Announcement Content</label>
+                <textarea id="content" name="content" required placeholder="Enter announcement text here..."></textarea>
+            </div>
+            <button type="submit">Add Announcement</button>
+        </form>
+    </div>
+
+    <div class="list-section">
+        <h2>Pending Approvals</h2>
+        <div id="pendingList">Loading...</div>
+    </div>
+
+    <div class="list-section">
+        <h2>Active Announcements (Ticker)</h2>
+        <p><i>Showing top 5 approved announcements.</i></p>
+        <div id="activeList">Loading...</div>
+    </div>
+
+    <div class="list-section">
+        <h2>History (Rejected/All)</h2>
+        <button onclick="loadAll()" style="background: #6c757d; font-size: 0.9em;">Load All History</button>
+        <div id="historyList" style="margin-top: 15px;"></div>
+    </div>
+
+    <script>
+        const API_URL = '/api/announcements';
+
+        async function fetchAnnouncements() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        throw new Error(errorJson.details || errorJson.error || 'Server error');
+                    } catch (e) {
+                         throw new Error(errorText || `HTTP error ${response.status}`);
+                    }
+                }
+                const data = await response.json();
+                if (!Array.isArray(data)) {
+                    throw new Error('Invalid data format received');
+                }
+                renderLists(data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                alert(`Failed to load announcements: ${error.message}`);
+                document.getElementById('pendingList').innerHTML = `<p style="color:red">Error: ${error.message}</p>`;
+                document.getElementById('activeList').innerHTML = `<p style="color:red">Error: ${error.message}</p>`;
+            }
+        }
+
+        function renderLists(items) {
+            const pending = items.filter(i => i.status === 'pending');
+            const approved = items.filter(i => i.status === 'approved').sort((a, b) => new Date(b.published_at) - new Date(a.published_at)); // newest first
+            
+            // Render Pending
+            const pendingHtml = pending.length ? pending.map(item => `
+                <div class="item">
+                    <div class="item-content">
+                        <div>${escapeHtml(item.content)}</div>
+                        <div class="item-meta">Created: ${new Date(item.created_at).toLocaleString()}</div>
+                    </div>
+                    <div class="actions">
+                        <button class="approve" onclick="approveItem('${item.id}')">Approve</button>
+                        <button class="reject" onclick="rejectItem('${item.id}')">Reject</button>
+                    </div>
+                </div>
+            `).join('') : '<p>No pending announcements.</p>';
+            document.getElementById('pendingList').innerHTML = pendingHtml;
+
+            // Render Active
+            const activeHtml = approved.length ? approved.map(item => `
+                <div class="item">
+                    <div class="item-content">
+                        <div>${escapeHtml(item.content)}</div>
+                        <div class="item-meta">Published: ${new Date(item.published_at).toLocaleString()}</div>
+                    </div>
+                    <div class="actions">
+                         <button class="reject" onclick="rejectItem('${item.id}')">Deactivate (Reject)</button>
+                    </div>
+                </div>
+            `).join('') : '<p>No active announcements.</p>';
+            document.getElementById('activeList').innerHTML = activeHtml;
+        }
+        
+        async function loadAll() {
+             try {
+                const response = await fetch(API_URL + '?status=all');
+                const data = await response.json();
+                const history = data.filter(i => i.status === 'rejected');
+                 const historyHtml = history.length ? history.map(item => `
+                <div class="item">
+                    <div class="item-content">
+                        <div>${escapeHtml(item.content)}</div>
+                         <div class="item-meta">Status: <span class="status-badge status-${item.status}">${item.status}</span> | Updated: ${new Date(item.updated_at).toLocaleString()}</div>
+                    </div>
+                    <div class="actions">
+                        <button class="approve" onclick="approveItem('${item.id}')">Re-Approve</button>
+                        <button class="delete" onclick="deleteItem('${item.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('') : '<p>No rejected/history items found.</p>';
+            document.getElementById('historyList').innerHTML = historyHtml;
+            } catch (error) {
+                console.error('Error fetching history:', error);
+            }
+        }
+
+        async function approveItem(id) {
+            if (!confirm('Approve this announcement?')) return;
+            await fetch(`${API_URL}/${id}/approve`, { method: 'POST' });
+            fetchAnnouncements();
+        }
+
+        async function rejectItem(id) {
+            if (!confirm('Reject/Deactivate this announcement?')) return;
+            await fetch(`${API_URL}/${id}/reject`, { method: 'POST' });
+            fetchAnnouncements();
+        }
+        
+        async function deleteItem(id) {
+            if (!confirm('Permanently DELETE this announcement?')) return;
+            await fetch(`${API_URL}/${id}/delete`, { method: 'POST' });
+            loadAll(); // Refresh history
+            fetchAnnouncements(); // Refresh others just in case
+        }
+
+        document.getElementById('addForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const content = document.getElementById('content').value;
+            if (!content) return;
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+                if (res.ok) {
+                    document.getElementById('content').value = '';
+                    fetchAnnouncements();
+                } else {
+                    alert('Error adding announcement');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Error submitting form');
+            }
+        });
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Initial load
+        fetchAnnouncements();
+    </script>
+</body>
+</html>
